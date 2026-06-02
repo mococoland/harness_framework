@@ -4,6 +4,15 @@ out/
 next-env.d.ts
 tsconfig.tsbuildinfo
 
-# phase execution outputs
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# phase execution outputs (ephemeral — produced by execute.py / child sessions)
 phases/**/phase*-output.json
 phases/**/step*-output.json
+phases/**/step*.result.json
+
+# example smoke-test artifact
+phases/example/HELLO.md

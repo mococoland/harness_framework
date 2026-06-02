@@ -1,0 +1,7 @@
+{
+  "project": "Harness Example",
+  "phase": "example",
+  "steps": [
+    { "step": 0, "name": "smoke-test", "status": "pending" }
+  ]
+}
