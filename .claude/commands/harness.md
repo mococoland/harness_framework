@@ -73,11 +73,15 @@
 
 상태 전이와 자동 기록 필드:
 
-| 전이 | 기록되는 필드 | 기록 주체 |
-|------|-------------|----------|
-| → `completed` | `completed_at`, `summary` | Claude 세션 (summary), execute.py (timestamp) |
-| → `error` | `failed_at`, `error_message` | Claude 세션 (message), execute.py (timestamp) |
-| → `blocked` | `blocked_at`, `blocked_reason` | Claude 세션 (reason), execute.py (timestamp) |
+step을 실행하는 Claude 세션은 **index.json을 직접 수정하지 않는다**. 대신 결과를
+`phases/{task-name}/step{N}.result.json`에 쓰고, execute.py가 그것을 읽어 index.json에
+머지하면서 타임스탬프를 기록한다 (index.json은 execute.py 단독 소유).
+
+| 전이 | result.json에 담는 필드 | execute.py가 머지하며 추가하는 필드 |
+|------|------------------------|--------------------------------|
+| → `completed` | `status`, `summary` | `completed_at` |
+| → `error` | `status`, `error_message` | `failed_at` |
+| → `blocked` | `status`, `blocked_reason` | `blocked_at` |
 
 `summary`는 step 완료 시 산출물을 한 줄로 요약한 것으로, execute.py가 다음 step 프롬프트에 컨텍스트로 누적 전달한다. 따라서 다음 step에 유용한 정보(생성된 파일, 핵심 결정 등)를 담아야 한다.
 
@@ -107,6 +111,9 @@
 ## Acceptance Criteria
 
 ```bash
+# 프로젝트 스택에 맞는 실제 검증 커맨드로 교체하라.
+# 예 (Node): npm run build && npm test
+# 예 (Python): python -m pytest -q
 npm run build   # 컴파일 에러 없음
 npm test        # 테스트 통과
 ```
@@ -118,10 +125,12 @@ npm test        # 테스트 통과
    - ARCHITECTURE.md 디렉토리 구조를 따르는가?
    - ADR 기술 스택을 벗어나지 않았는가?
    - CLAUDE.md CRITICAL 규칙을 위반하지 않았는가?
-3. 결과에 따라 `phases/{task-name}/index.json`의 해당 step을 업데이트한다:
-   - 성공 → `"status": "completed"`, `"summary": "산출물 한 줄 요약"`
-   - 수정 3회 시도 후에도 실패 → `"status": "error"`, `"error_message": "구체적 에러 내용"`
-   - 사용자 개입 필요 (API 키, 외부 인증, 수동 설정 등) → `"status": "blocked"`, `"blocked_reason": "구체적 사유"` 후 즉시 중단
+3. 결과를 `phases/{task-name}/step{N}.result.json` 파일에 기록한다.
+   **index.json은 직접 수정하지 않는다** — 하네스(execute.py)가 단독 관리하며,
+   이 result 파일을 읽어 index.json에 머지한다.
+   - 성공 → `{ "status": "completed", "summary": "산출물 한 줄 요약" }`
+   - 수정 3회 시도 후에도 실패 → `{ "status": "error", "error_message": "구체적 에러 내용" }`
+   - 사용자 개입 필요 (API 키, 외부 인증, 수동 설정 등) → `{ "status": "blocked", "blocked_reason": "구체적 사유" }` 후 즉시 중단
 
 ## 금지사항
 
@@ -132,8 +141,9 @@ npm test        # 테스트 통과
 ### E. 실행
 
 ```bash
-python3 scripts/execute.py {task-name}        # 순차 실행
-python3 scripts/execute.py {task-name} --push  # 실행 후 push
+python scripts/execute.py {task-name}          # 순차 실행 (Windows: python, Unix: python3)
+python scripts/execute.py {task-name} --push    # 실행 후 push
+python scripts/execute.py {task-name} --strict  # docs에 {placeholder} 남아있으면 중단
 ```
 
 execute.py가 자동으로 처리하는 것:
